@@ -10,33 +10,45 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+const (
+	configFileName = ".tfapprove.toml"
+)
+
+// TOML configuration struct
+// Some field values are injected via .tfapprove.toml
 type Config struct {
 	Server  Server
 	Approve Approve
 	Command Command
 
+	// Stack CLI arguments
 	args []string `toml:"-"`
 }
 
+// Server struct
 type Server struct {
-	Url    string `toml:"url"`
+	// URL always use fixed value so the user could not change this field.
+	Url    string
 	ApiKey string `toml:"api_key"`
 }
 
+// Command setting struct
 type Command struct {
 	TerraformCommandPath string `toml:"terraform"`
 }
 
+// Approvement configuration struct
 type Approve struct {
 	SlackChannel  string `toml:"slack_channel"`
 	NeedApprovers int    `toml:"need_approvers"`
 	WaitTimeout   int    `toml:"wait_timeout"`
 }
 
+// defaultConfig() generates default configuration with default value.
 func defaultConfig() Config {
 	return Config{
 		Server: Server{
-			Url:    "wss://tfapprove.com",
+			Url:    aggregateServer,
 			ApiKey: "",
 		},
 		Command: Command{
@@ -49,12 +61,14 @@ func defaultConfig() Config {
 	}
 }
 
+// Create new configuration pointer.
+// Find .tfapprove.toml file on current directory and decode it
 func newConfig() (*Config, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
-	file := filepath.Join(pwd, ".tfapprove.toml")
+	file := filepath.Join(pwd, configFileName)
 
 	var c Config = defaultConfig()
 	args := os.Args[1:]
@@ -76,6 +90,7 @@ func newConfig() (*Config, error) {
 	return &c, nil
 }
 
+// Check apply command because we need to wrap apply command
 func (c *Config) IsApply() bool {
 	for i := range c.args {
 		if c.args[i] == "apply" {
@@ -85,6 +100,7 @@ func (c *Config) IsApply() bool {
 	return false
 }
 
+// Check generate command because generate subcommand is only enable on this command
 func (c *Config) IsGenerate() bool {
 	for i := range c.args {
 		if c.args[i] == "generate" {
@@ -94,13 +110,19 @@ func (c *Config) IsGenerate() bool {
 	return false
 }
 
+// Check version subcommand
+func (c *Config) IsVersion() bool {
+	for i := range c.args {
+		if c.args[i] == "version" {
+			return true
+		}
+	}
+	return false
+}
+
 var configTemplate = `### Server configuration
 [Server]
-  # Default url indicates shared application server.
-  # If you make own application server, change this field.
-  url = "wss://tfapprove.com"
-
-  # API Key is needed for communicate with application server.
+  # API Key is needed for communicating with application server.
   # For secret reason, you can speficy this value via envrionment variable of "TFAPPROVE_API_KEY".
   api_key = ""
 
@@ -121,12 +143,13 @@ var configTemplate = `### Server configuration
   terraform = "terraform"
 `
 
+// Generate configuration file
 func generateConfig() error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	file := filepath.Join(pwd, ".tfapprove.toml")
+	file := filepath.Join(pwd, configFileName)
 	if _, err := os.Stat(file); err == nil {
 		return errors.New("Configuration file already exists")
 	}

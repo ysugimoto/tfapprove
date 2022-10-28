@@ -1,0 +1,37 @@
+name: Release with archifact
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.17.5
+      - name: Lint programs
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.42
+          skip-pkg-cache: true
+          skip-build-cache: true
+          skip-go-installation: true
+      - name: Build platform binaries
+        run: VERSION=$(echo ${{ github.ref }} | sed -e "s#refs/tags/##g") SERVER=${{ secrets.SERVER }} make build
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/tfapprove-linux-amd64
+            dist/tfapprove-darwin-amd64
+            dist/tfapprove-darwin-arm64
+            dist/tfapprove-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -6,6 +6,10 @@ import (
 	"os/exec"
 )
 
+// These values are injected via compilation time
+var aggregateServer string = ""
+var version string = "dev"
+
 func main() {
 	if err := _main(); err != nil {
 		if e, ok := err.(*exec.ExitError); ok {
@@ -22,15 +26,26 @@ func _main() error {
 		return err
 	}
 
-	if c.IsApply() {
+	switch {
+	case c.IsApply():
 		return wrapTerraformApply(c)
-	} else if c.IsGenerate() {
+	case c.IsGenerate():
 		if err := generateConfig(); err != nil {
 			return err
 		}
 		io.WriteString(os.Stdout, "Configuration file has generated!\n")
 		return nil
-	} else {
-		return passTerraform(c)
+	case c.IsVersion():
+		io.WriteString(os.Stdout, "TFApprove  " + version + "\n")
+		io.WriteString(os.Stdout, "---------\n")
+		fallthrough
+	default:
+		// Simply pass arguments to the "terraform" command
+		cmd := exec.Command(c.Command.TerraformCommandPath, c.args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+
+		return cmd.Run()
 	}
 }

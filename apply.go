@@ -16,25 +16,37 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// Removale shell escape sequence
 var trimColorRegex = regexp.MustCompile(`\033\[[0-9]+m`)
 
+// Following string is spcific point of terraform apply command output.
 const (
+	// EnterValueMessage is trap point to wait for inputting "yes" of "no" from terraform
 	EnterValueMessage = "Enter a value:"
+	// PlanStart is trap point to start collecting plan result
 	PlanStart         = "Terraform will perform the following actions:"
+	// PlanEnd is trap point to end collecting plan result
 	PlanEnd           = "Plan:"
+	// yes is shortcut command to input "yes"
 	yes               = "yes\n"
+	// no is shortcut command to input "no"
 	no                = "no\n"
 )
 
+// Wrap "terraform apply" command function
+// Pipe stdout, stderr, stdin of terraform apply process.
 func wrapTerraformApply(c *Config) error {
 	cmd := exec.Command(c.Command.TerraformCommandPath, c.args...)
 	cmd.Stderr = os.Stderr
 
+	// Capture terraform output
 	sop, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
 
+	// Wrap stdin to trap user input.
+	// tfapprove supresses that the user input "yes" or "no" directly.
 	sip, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -50,6 +62,7 @@ func wrapTerraformApply(c *Config) error {
 	var isPlanning bool
 	var delimiter byte = ':'
 
+	// Collect plan data and wait for approval
 	go func() {
 		for {
 			out, _ := r.ReadString(delimiter)
@@ -84,6 +97,7 @@ func wrapTerraformApply(c *Config) error {
 		}
 	}()
 
+	// Wait approval result and pass "yes" or "no" to the terraform process
 	go func() {
 		ok := <-applyChan
 		if ok {
@@ -96,9 +110,10 @@ func wrapTerraformApply(c *Config) error {
 	return cmd.Wait()
 }
 
+// Connect to aggregate server and check the member approved or rejected.
 func waitForApproval(ac chan bool, c *Config, plan string) error {
 	sessionId := uuid.New().String()
-	dc, err := websocket.NewConfig(fmt.Sprintf("%s/wait/%s", c.Server.Url, sessionId), c.Server.Url)
+	dc, err := websocket.NewConfig(fmt.Sprintf("%s/%s", c.Server.Url, sessionId), c.Server.Url)
 	if err != nil {
 		ac <- false
 		return err
@@ -111,6 +126,7 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 	}
 	defer conn.Close()
 
+	// Send handshake
 	if err := websocket.JSON.Send(conn, Handshake{
 		Plan:    plan,
 		Channel: c.Approve.SlackChannel,
