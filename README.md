@@ -36,7 +36,7 @@ The configuration example is following
   api_key = ""
 
 [Approve]
-  # Slack channel ID like CXXXXXXXX format that post approval message to.
+  # Slack channel ID or channel name that send approval message to.
   slack_channel = ""
 
   # Minimum approvers to continue apply.

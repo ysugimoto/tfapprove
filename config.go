@@ -126,7 +126,7 @@ var configTemplate = `### Server configuration
 
 ### Approval configuration
 [Approve]
-  # Slack channel ID like CXXXXXXXX that post approval message to.
+  # Slack channel ID or channel name that send approval message to.
   slack_channel = ""
 
   # Minimum approvers to continue apply.
