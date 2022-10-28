@@ -15,7 +15,7 @@ func main() {
 		if e, ok := err.(*exec.ExitError); ok {
 			os.Exit(e.ExitCode())
 		} else {
-			io.WriteString(os.Stderr, err.Error())
+			_, _ = io.WriteString(os.Stderr, err.Error())
 		}
 	}
 }
@@ -33,11 +33,11 @@ func _main() error {
 		if err := generateConfig(); err != nil {
 			return err
 		}
-		io.WriteString(os.Stdout, "Configuration file has generated!\n")
+		_, _ = io.WriteString(os.Stdout, "Configuration file has generated!\n")
 		return nil
 	case c.IsVersion():
-		io.WriteString(os.Stdout, "TFApprove  " + version + "\n")
-		io.WriteString(os.Stdout, "---------\n")
+		_, _ = io.WriteString(os.Stdout, "TFApprove  "+version+"\n")
+		_, _ = io.WriteString(os.Stdout, "---------\n")
 		fallthrough
 	default:
 		// Simply pass arguments to the "terraform" command

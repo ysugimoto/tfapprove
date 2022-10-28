@@ -6,9 +6,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
-	"regexp"
 
 	"os/exec"
 
@@ -24,13 +24,13 @@ const (
 	// EnterValueMessage is trap point to wait for inputting "yes" of "no" from terraform
 	EnterValueMessage = "Enter a value:"
 	// PlanStart is trap point to start collecting plan result
-	PlanStart         = "Terraform will perform the following actions:"
+	PlanStart = "Terraform will perform the following actions:"
 	// PlanEnd is trap point to end collecting plan result
-	PlanEnd           = "Plan:"
+	PlanEnd = "Plan:"
 	// yes is shortcut command to input "yes"
-	yes               = "yes\n"
+	yes = "yes\n"
 	// no is shortcut command to input "no"
-	no                = "no\n"
+	no = "no\n"
 )
 
 // Wrap "terraform apply" command function
@@ -68,7 +68,7 @@ func wrapTerraformApply(c *Config) error {
 			out, _ := r.ReadString(delimiter)
 			if strings.Contains(out, PlanStart) {
 				isPlanning = true
-				io.WriteString(os.Stdout, out)
+				_, _ = io.WriteString(os.Stdout, out)
 				continue
 			} else if strings.Contains(out, PlanEnd) {
 				if index := strings.Index(out, PlanEnd); index > 0 {
@@ -76,10 +76,10 @@ func wrapTerraformApply(c *Config) error {
 				}
 				isPlanning = false
 			}
-			if strings.Contains(out, "Enter a value:") {
+			if strings.Contains(out, EnterValueMessage) {
 				spl := strings.Split(out, "\n")
-				io.WriteString(os.Stdout, strings.Join(spl[0:len(spl)-6], "\n"))
-				io.WriteString(os.Stdout, "\n\ntfapprove prevents confirmation input.\nWating for approval...")
+				_, _ = io.WriteString(os.Stdout, strings.Join(spl[0:len(spl)-6], "\n"))
+				_, _ = io.WriteString(os.Stdout, "\n\ntfapprove prevents confirmation input.\nWating for approval...")
 				go func() {
 					planData = trimColorRegex.ReplaceAllString(planData, "")
 					if err := waitForApproval(applyChan, c, planData); err != nil {
@@ -93,7 +93,7 @@ func wrapTerraformApply(c *Config) error {
 			if isPlanning {
 				planData += out
 			}
-			io.WriteString(os.Stdout, out)
+			_, _ = io.WriteString(os.Stdout, out)
 		}
 	}()
 
@@ -101,10 +101,10 @@ func wrapTerraformApply(c *Config) error {
 	go func() {
 		ok := <-applyChan
 		if ok {
-			io.WriteString(sip, yes)
+			_, _ = io.WriteString(sip, yes)
 			return
 		}
-		io.WriteString(sip, no)
+		_, _ = io.WriteString(sip, no)
 	}()
 
 	return cmd.Wait()

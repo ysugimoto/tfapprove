@@ -2,7 +2,7 @@ package main
 
 // Handshake type is message for communicate with aggregate server
 type Handshake struct {
-	Plan string `json:"action"`
+	Plan    string `json:"action"`
 	Channel string `json:"user"`
 }
 
@@ -11,4 +11,3 @@ type Message struct {
 	Action string `json:"action"`
 	User   string `json:"user"`
 }
-
