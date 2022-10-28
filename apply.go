@@ -79,11 +79,15 @@ func wrapTerraformApply(c *Config) error {
 			if strings.Contains(out, EnterValueMessage) {
 				spl := strings.Split(out, "\n")
 				_, _ = io.WriteString(os.Stdout, strings.Join(spl[0:len(spl)-6], "\n"))
-				_, _ = io.WriteString(os.Stdout, "\n\ntfapprove prevents confirmation input.\nWating for approval...")
+				_, _ = io.WriteString(os.Stdout, "\n\ntfapprove prevents confirmation input.\nWating for approval...\n")
 				go func() {
 					planData = trimColorRegex.ReplaceAllString(planData, "")
 					if err := waitForApproval(applyChan, c, planData); err != nil {
-						log.Printf("[TFApprove] %s\n", err)
+						if err == io.EOF {
+							log.Printf("[TFApprove] %s\n", "Connection Closed")
+						} else {
+							log.Printf("[TFApprove] %s\n", err)
+						}
 					}
 				}()
 				delimiter = '\n'
@@ -113,7 +117,7 @@ func wrapTerraformApply(c *Config) error {
 // Connect to aggregate server and check the member approved or rejected.
 func waitForApproval(ac chan bool, c *Config, plan string) error {
 	sessionId := uuid.New().String()
-	dc, err := websocket.NewConfig(fmt.Sprintf("%s/%s", c.Server.Url, sessionId), c.Server.Url)
+	dc, err := websocket.NewConfig(fmt.Sprintf("%s/%s", server, sessionId), server)
 	if err != nil {
 		ac <- false
 		return err
@@ -122,7 +126,7 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 	conn, err := websocket.DialConfig(dc)
 	if err != nil {
 		ac <- false
-		return fmt.Errorf("Failed to connect step server")
+		return fmt.Errorf("Failed to connect aggregate server")
 	}
 	defer conn.Close()
 

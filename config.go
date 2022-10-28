@@ -28,7 +28,6 @@ type Config struct {
 // Server struct
 type Server struct {
 	// URL always use fixed value so the user could not change this field.
-	Url    string
 	ApiKey string `toml:"api_key"`
 }
 
@@ -48,7 +47,6 @@ type Approve struct {
 func defaultConfig() Config {
 	return Config{
 		Server: Server{
-			Url:    aggregateServer,
 			ApiKey: "",
 		},
 		Command: Command{

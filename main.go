@@ -7,7 +7,7 @@ import (
 )
 
 // These values are injected via compilation time
-var aggregateServer string = ""
+var server string = ""
 var version string = "dev"
 
 func main() {
