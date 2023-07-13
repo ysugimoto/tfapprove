@@ -11,3 +11,7 @@ type Message struct {
 	Action string `json:"action"`
 	User   string `json:"user"`
 }
+
+type Action struct {
+	Type string `json:"type"`
+}
