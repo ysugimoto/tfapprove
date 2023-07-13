@@ -88,6 +88,7 @@ func wrapTerraformApply(c *Config) error {
 						} else {
 							log.Printf("[TFApprove] %s\n", err)
 						}
+						cmd.Process.Kill()
 					}
 				}()
 				delimiter = '\n'
@@ -140,8 +141,10 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 	}
 
 	timeout := time.After(time.Duration(c.Approve.WaitTimeout) + time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
 	action := make(chan bool)
 	errCh := make(chan error)
+	defer ticker.Stop()
 
 	go func() {
 		var approvals int
@@ -170,15 +173,26 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 		}
 	}()
 
-	select {
-	case <-timeout:
-		log.Println("[TFApprove] Wait timeout, cancel apply")
-		ac <- false
-		return nil
-	case result := <-action:
-		ac <- result
-		return nil
-	case err := <-errCh:
-		return err
+	for {
+		select {
+		case <-timeout:
+			log.Println("[TFApprove] Wait timeout, cancel apply")
+			websocket.JSON.Send(conn, Action{
+				Type: "timeout",
+			})
+			ac <- false
+			return nil
+		case result := <-action:
+			ac <- result
+			return nil
+		case err := <-errCh:
+			return err
+		case <-ticker.C:
+			if err := websocket.JSON.Send(conn, Action{
+				Type: "ping",
+			}); err != nil {
+				ac <- false
+			}
+		}
 	}
 }
