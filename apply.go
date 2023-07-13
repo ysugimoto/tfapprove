@@ -88,7 +88,7 @@ func wrapTerraformApply(c *Config) error {
 						} else {
 							log.Printf("[TFApprove] %s\n", err)
 						}
-						cmd.Process.Kill()
+						_ = cmd.Process.Kill()
 					}
 				}()
 				delimiter = '\n'
@@ -177,7 +177,7 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 		select {
 		case <-timeout:
 			log.Println("[TFApprove] Wait timeout, cancel apply")
-			websocket.JSON.Send(conn, Action{
+			_ = websocket.JSON.Send(conn, Action{
 				Type: "timeout",
 			})
 			ac <- false
