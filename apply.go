@@ -82,13 +82,13 @@ func wrapTerraformApply(c *Config) error {
 				_, _ = io.WriteString(os.Stdout, "\n\ntfapprove prevents confirmation input.\nWating for approval...\n")
 				go func() {
 					planData = trimColorRegex.ReplaceAllString(planData, "")
-					if err := waitForApproval(applyChan, c, planData); err != nil {
+					if err := waitForApproval(applyChan, c, strings.TrimSpace(planData)); err != nil {
 						if err == io.EOF {
 							log.Printf("[TFApprove] %s\n", "Connection Closed")
 						} else {
 							log.Printf("[TFApprove] %s\n", err)
 						}
-						_ = cmd.Process.Kill()
+						applyChan <- false
 					}
 				}()
 				delimiter = '\n'
@@ -106,9 +106,11 @@ func wrapTerraformApply(c *Config) error {
 	go func() {
 		ok := <-applyChan
 		if ok {
+			log.Println("Apply this plan")
 			_, _ = io.WriteString(sip, yes)
 			return
 		}
+		log.Println("Cancel this plan")
 		_, _ = io.WriteString(sip, no)
 	}()
 
@@ -183,6 +185,9 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 			ac <- false
 			return nil
 		case result := <-action:
+			_ = websocket.JSON.Send(conn, Action{
+				Type: "done",
+			})
 			ac <- result
 			return nil
 		case err := <-errCh:
