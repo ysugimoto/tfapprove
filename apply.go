@@ -28,9 +28,9 @@ const (
 	// PlanEnd is trap point to end collecting plan result
 	PlanEnd = "Plan:"
 	// yes is shortcut command to input "yes"
-	yes = "yes\n"
+	yes = "yes\r\n"
 	// no is shortcut command to input "no"
-	no = "no\n"
+	no = "no\r\n"
 )
 
 // Wrap "terraform apply" command function
