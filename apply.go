@@ -92,6 +92,7 @@ func wrapTerraformApply(c *Config) error {
 					}
 				}()
 				delimiter = '\n'
+				isPlanning = false
 				continue
 			}
 
@@ -108,8 +109,6 @@ func wrapTerraformApply(c *Config) error {
 		if ok {
 			log.Println("Apply this plan")
 			_, _ = io.WriteString(sip, yes)
-			_ = cmd.Process.Kill()
-			os.Exit(0)
 		} else {
 			log.Println("Cancel this plan")
 			_, _ = io.WriteString(sip, no)
