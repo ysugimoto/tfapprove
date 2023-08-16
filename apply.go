@@ -28,9 +28,9 @@ const (
 	// PlanEnd is trap point to end collecting plan result
 	PlanEnd = "Plan:"
 	// yes is shortcut command to input "yes"
-	yes = "yes\r\n"
+	yes = "yes\n"
 	// no is shortcut command to input "no"
-	no = "no\r\n"
+	no = "no\n"
 )
 
 // Wrap "terraform apply" command function
@@ -57,7 +57,7 @@ func wrapTerraformApply(c *Config) error {
 	}
 
 	r := bufio.NewReader(sop)
-	applyChan := make(chan bool)
+	applyChan := make(chan bool, 1)
 	var planData string
 	var isPlanning bool
 	var delimiter byte = ':'
@@ -80,19 +80,18 @@ func wrapTerraformApply(c *Config) error {
 				spl := strings.Split(out, "\n")
 				_, _ = io.WriteString(os.Stdout, strings.Join(spl[0:len(spl)-6], "\n"))
 				_, _ = io.WriteString(os.Stdout, "\n\ntfapprove prevents confirmation input.\nWating for approval...\n")
-				go func() {
-					planData = trimColorRegex.ReplaceAllString(planData, "")
-					if err := waitForApproval(applyChan, c, strings.TrimSpace(planData)); err != nil {
-						if err == io.EOF {
-							log.Printf("[TFApprove] %s\n", "Connection Closed")
-						} else {
-							log.Printf("[TFApprove] %s\n", err)
-						}
-						applyChan <- false
+				planData = trimColorRegex.ReplaceAllString(planData, "")
+				action, err := waitForApproval(c, strings.TrimSpace(planData))
+				if err != nil {
+					if err == io.EOF {
+						log.Printf("[TFApprove] %s\n", "Connection Closed")
+					} else {
+						log.Printf("[TFApprove] %s\n", err)
 					}
-				}()
+					applyChan <- false
+				}
 				delimiter = '\n'
-				isPlanning = false
+				applyChan <- action
 				continue
 			}
 
@@ -109,31 +108,29 @@ func wrapTerraformApply(c *Config) error {
 		if ok {
 			log.Println("Apply this plan")
 			_, _ = io.WriteString(sip, yes)
+			sip.Close()
 		} else {
 			log.Println("Cancel this plan")
 			_, _ = io.WriteString(sip, no)
 			_ = cmd.Process.Kill()
 			os.Exit(1)
 		}
-		sip.Close()
 	}()
 
 	return cmd.Wait()
 }
 
 // Connect to aggregate server and check the member approved or rejected.
-func waitForApproval(ac chan bool, c *Config, plan string) error {
+func waitForApproval(c *Config, plan string) (bool, error) {
 	sessionId := uuid.New().String()
 	dc, err := websocket.NewConfig(fmt.Sprintf("%s/%s", server, sessionId), server)
 	if err != nil {
-		ac <- false
-		return err
+		return false, err
 	}
 	dc.Header.Add("TFApprove-Api-Key", c.Server.ApiKey)
 	conn, err := websocket.DialConfig(dc)
 	if err != nil {
-		ac <- false
-		return fmt.Errorf("Failed to connect aggregate server")
+		return false, fmt.Errorf("Failed to connect aggregate server")
 	}
 	defer conn.Close()
 
@@ -142,11 +139,10 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 		Plan:    plan,
 		Channel: c.Approve.SlackChannel,
 	}); err != nil {
-		ac <- false
-		return err
+		return false, err
 	}
 
-	timeout := time.After(time.Duration(c.Approve.WaitTimeout) + time.Minute)
+	timeout := time.After(time.Duration(c.Approve.WaitTimeout) * time.Minute)
 	ticker := time.NewTicker(10 * time.Second)
 	action := make(chan bool)
 	errCh := make(chan error)
@@ -165,7 +161,7 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 				fmt.Fprintf(os.Stdout, "%s approved your plan.", msg.User)
 				approvals++
 				if approvals >= c.Approve.NeedApprovers {
-					fmt.Fprint(os.Stdout, "Continue to apply!\n")
+					fmt.Fprint(os.Stdout, " Continue to apply!\n")
 					action <- true
 					return
 				} else {
@@ -186,21 +182,19 @@ func waitForApproval(ac chan bool, c *Config, plan string) error {
 			_ = websocket.JSON.Send(conn, Action{
 				Type: "timeout",
 			})
-			ac <- false
-			return nil
+			return false, nil
 		case result := <-action:
 			_ = websocket.JSON.Send(conn, Action{
 				Type: "done",
 			})
-			ac <- result
-			return nil
+			return result, nil
 		case err := <-errCh:
-			return err
+			return false, err
 		case <-ticker.C:
 			if err := websocket.JSON.Send(conn, Action{
 				Type: "ping",
 			}); err != nil {
-				ac <- false
+				return false, err
 			}
 		}
 	}
