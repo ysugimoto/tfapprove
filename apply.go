@@ -28,9 +28,9 @@ const (
 	// PlanEnd is trap point to end collecting plan result
 	PlanEnd = "Plan:"
 	// yes is shortcut command to input "yes"
-	yes = "yes\r\n"
+	yes = "yes\n"
 	// no is shortcut command to input "no"
-	no = "no\r\n"
+	no = "no\n"
 )
 
 // Wrap "terraform apply" command function
@@ -112,6 +112,7 @@ func wrapTerraformApply(c *Config) error {
 		}
 		log.Println("Cancel this plan")
 		_, _ = io.WriteString(sip, no)
+		sip.Close()
 	}()
 
 	return cmd.Wait()
